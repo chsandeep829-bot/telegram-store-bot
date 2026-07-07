@@ -1,3 +1,2 @@
 python-telegram-bot==20.3
 aiohttp==3.8.4
-pure-qrcode==1.0.0
