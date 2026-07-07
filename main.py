@@ -2,15 +2,12 @@ import random
 import urllib.parse
 import logging
 import re
-import io
 import os  # Critical: Reads the dynamic server port configurations on Render
-import qrcode  # Re-mapped to pure-python implementation matrix
-from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     ContextTypes,
     filters
 )
@@ -142,7 +139,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Price processing failed. Please select a valid key amount.")
                 return
                 
-            price_amount = prices
+            price_amount = str(prices[0])
             random_suffix = random.randint(1000, 9999)
             order_id = f"ORD{random_suffix}"
             
@@ -163,27 +160,20 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             encoded_url = "upi://pay?" + urllib.parse.urlencode(upi_payload, quote_via=urllib.parse.quote)
 
-            # --- PURE-PYTHON QR CODE GENERATOR (NO PILLOW) ---
-            qr = qrcode.QRCode(version=1, border=3)
-            qr.add_data(encoded_url)
-            qr.make(fit=True)
-            
-            bio = io.BytesIO()
-            bio.name = 'payment_qr.png'
-            qr.write_png(bio, box_size=10)  # Stream PNG data matrix loop directly
-            bio.seek(0)
-
+            # Generate a secure text-based quick pay layout block
             checkout_caption = (
                 f"💳 **Payment Checkout**\n\n"
                 f"💵 Amount: **₹{price_amount}**\n"
                 f"📦 Item: `{text}`\n"
                 f"🧾 Order ID: `{order_id}`\n\n"
-                f"📷 **Scan this QR Code using GPay, PhonePe, or Paytm to pay instantly.**"
+                f"📱 **Tap the official payment link below to load your UPI app:**\n"
+                f"`{encoded_url}`\n\n"
+                f"Alternatively, copy and transfer to our merchant ID manually:\n"
+                f"`{MERCHANT_UPI_ID}`"
             )
 
-            await update.message.reply_photo(
-                photo=bio,
-                caption=checkout_caption,
+            await update.message.reply_text(
+                text=checkout_caption,
                 parse_mode="Markdown"
             )
             
