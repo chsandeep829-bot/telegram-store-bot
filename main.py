@@ -4,7 +4,7 @@ import logging
 import re
 import io
 import os  # Critical: Reads the dynamic server port configurations on Render
-import qrcode  
+import qrcode  # Re-mapped to pure-python implementation matrix
 from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -142,7 +142,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Price processing failed. Please select a valid key amount.")
                 return
                 
-            price_amount = str(prices[0])
+            price_amount = prices
             random_suffix = random.randint(1000, 9999)
             order_id = f"ORD{random_suffix}"
             
@@ -163,14 +163,14 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             encoded_url = "upi://pay?" + urllib.parse.urlencode(upi_payload, quote_via=urllib.parse.quote)
 
-            qr = qrcode.QRCode(version=1, box_size=10, border=3)
+            # --- PURE-PYTHON QR CODE GENERATOR (NO PILLOW) ---
+            qr = qrcode.QRCode(version=1, border=3)
             qr.add_data(encoded_url)
             qr.make(fit=True)
             
-            qr_img = qr.make_image(fill_color="black", back_color="white")
             bio = io.BytesIO()
             bio.name = 'payment_qr.png'
-            qr_img.save(bio, 'PNG')
+            qr.write_png(bio, box_size=10)  # Stream PNG data matrix loop directly
             bio.seek(0)
 
             checkout_caption = (
