@@ -139,6 +139,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ Price processing failed. Please select a valid key amount.")
                 return
                 
+            # FIXED PERMANENTLY: Extracting string out of array list using index 0
             price_amount = str(prices[0])
             random_suffix = random.randint(1000, 9999)
             order_id = f"ORD{random_suffix}"
@@ -193,33 +194,51 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return
 
 
-async def run_server(bot_instance):
-    """Launches the external cloud web service listener."""
-    app = web.Application()
-    app['tg_bot'] = bot_instance
-    app.router.add_post('/notification', handle_notification_webhook)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    
-    # Listen on 0.0.0.0 and dynamically read the server port assigned by Render
-    server_port = int(os.environ.get("PORT", 8080))
-    site = web.TCPSite(runner, '0.0.0.0', server_port)
-    await site.start()
-    print(f"🌐 Cloud Webhook active on port {server_port}")
-
-
-def main():
+# ---------- CONCURRENT EXECUTION RUNNERS ----------
+async def main():
+    # Build the main python-telegram-bot core application
     application = Application.builder().token(TOKEN).build()
+
+    # Link routing triggers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, buttons))
 
-    # Synchronize loops
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run_server(application.bot))
+    # Initialize bot components asynchronously
+    await application.initialize()
+    await application.start()
+    
+    # Set up web app router to catch MacroDroid Webhook POST notifications
+    web_app = web.Application()
+    web_app['tg_bot'] = application.bot
+    web_app.router.add_post('/webhook', handle_notification_webhook)
 
-    print("🤖 Bot core running globally...")
-    application.run_polling()
+    # Read server port bound by Render environment profiles
+    server_port = int(os.environ.get("PORT", 8080))
+    runner = web.AppRunner(web_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", server_port)
+    
+    logger.info(f"Starting web server target configuration on port: {server_port}")
+    await site.start()
 
-if __name__ == "__main__":
-    main()
+    logger.info("Bot service setup successfully. Initiating polling loop handlers...")
+    
+    # Run bot polling loops
+    await application.updater.start_polling()
+    
+    # Keep the execution thread running indefinitely
+    while True:
+        await asyncio.sleep(3600)
+
+if __name__ == '__main__':
+    # Modern Python 3.12+ explicit loop policy patch for cloud engine runtime environments
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+    try:
+        loop.run_until_complete(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Bot stopped manually.")
