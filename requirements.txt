@@ -1,2 +1,4 @@
-python-telegram-bot==20.3
-aiohttp==3.8.4
+python-telegram-bot[job-queue]==21.10
+aiohttp==3.9.5 --only-binary :all:
+multidict==6.0.5 --only-binary :all:
+yarl==1.9.4 --only-binary :all:
